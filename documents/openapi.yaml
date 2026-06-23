@@ -1,0 +1,1828 @@
+openapi: 3.0.3
+info:
+  title: HiLite Sales OS API
+  version: "1.0.0"
+  description: |
+    Multi-tenant Sales ERP API — five modules, two authentication principals
+    (platform admin and org user), tenant isolation enforced server-side on
+    every request. See `API.md` in the repository for the full narrative
+    walkthrough (auth lifecycle, multi-tenancy model, rate limiting); this
+    spec is the machine-readable mirror of that same documentation.
+  contact:
+    name: HiLite Sales OS
+servers:
+  - url: http://localhost:4000
+    description: Local development
+
+tags:
+  - name: Health
+  - name: Platform Auth
+    description: Module 1 — platform admin login/session lifecycle
+  - name: Platform Organizations
+    description: Module 1 — tenant CRUD, status, module enablement
+  - name: Platform Modules
+    description: Module 1 — master module catalog
+  - name: Org Auth
+    description: Module 2 — org user login/session lifecycle
+  - name: Org Teams
+    description: Module 2 — admin-only
+  - name: Org Roles
+    description: Module 2 — admin-only
+  - name: Org Users
+    description: Module 2 — admin-only
+  - name: Org Modules
+    description: Module 2 — admin-only, read-only
+  - name: Sales Leads
+    description: Module 3 — open to any org user, visibility scoped by role
+  - name: Dashboard
+    description: Module 4 — open to any org user, response scoped by role
+  - name: Notifications
+    description: Module 5 — open to any org user, scoped to their own
+
+security: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness check
+      security: []
+      responses:
+        "200":
+          description: API is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      status: { type: string, example: ok }
+                      time: { type: string, format: date-time }
+
+  # ---------------------------------------------------------------------
+  # Module 1 — Platform Administration
+  # ---------------------------------------------------------------------
+  /api/platform/auth/login:
+    post:
+      tags: [Platform Auth]
+      summary: Platform admin login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/AuthTokens"
+                          - type: object
+                            properties:
+                              admin: { $ref: "#/components/schemas/PlatformAdmin" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/platform/auth/refresh:
+    post:
+      tags: [Platform Auth]
+      summary: Exchange a refresh token for a new access+refresh pair (rotates the old one)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200":
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/AuthTokens"
+                          - type: object
+                            properties:
+                              admin: { $ref: "#/components/schemas/PlatformAdmin" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/platform/auth/logout:
+    post:
+      tags: [Platform Auth]
+      summary: Revoke a refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200":
+          description: Always succeeds, even if the token was already invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" }
+
+  /api/platform/auth/me:
+    get:
+      tags: [Platform Auth]
+      summary: Current platform admin profile
+      security: [{ platformBearerAuth: [] }]
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/PlatformAdmin" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/platform/auth/change-password:
+    post:
+      tags: [Platform Auth]
+      summary: Self-service password change (requires current password)
+      security: [{ platformBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChangePasswordRequest" }
+      responses:
+        "200":
+          description: Changed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/platform/organizations:
+    post:
+      tags: [Platform Organizations]
+      summary: Create an organization (+ its first admin user, one transaction)
+      security: [{ platformBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateOrganizationRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/CreateOrganizationResult" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [Platform Organizations]
+      summary: List organizations
+      security: [{ platformBearerAuth: [] }]
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+          description: Matches name or code
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, suspended] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - $ref: "#/components/schemas/PaginatedMeta"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/OrganizationListItem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/platform/organizations/{id}:
+    get:
+      tags: [Platform Organizations]
+      summary: Organization detail (modules + primary admin)
+      security: [{ platformBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+      responses:
+        "200":
+          description: Detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/OrganizationDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/platform/organizations/{id}/reset-admin-password:
+    post:
+      tags: [Platform Organizations]
+      summary: Generate a new temp password for this org's admin (lockout recovery)
+      description: Revokes the admin's active sessions and sets `must_change_password`.
+      security: [{ platformBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+      responses:
+        "200":
+          description: New temp password (shown once)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          adminUser: { $ref: "#/components/schemas/OrgAdminUser" }
+                          tempPassword: { type: string, example: "Atlas-889-1bib" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/platform/organizations/{id}/status:
+    patch:
+      tags: [Platform Organizations]
+      summary: Suspend or reactivate an organization
+      description: Suspending immediately revokes every session for every user in that org.
+      security: [{ platformBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, suspended] }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Organization" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/platform/organizations/{id}/modules:
+    patch:
+      tags: [Platform Organizations]
+      summary: Enable/disable modules for this organization (upsert)
+      security: [{ platformBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [modules]
+              properties:
+                modules:
+                  type: array
+                  items:
+                    type: object
+                    required: [moduleId, enabled]
+                    properties:
+                      moduleId: { type: integer, example: 1 }
+                      enabled: { type: boolean }
+      responses:
+        "200":
+          description: Updated per-module flags
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/OrgModuleFlag" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/platform/modules:
+    get:
+      tags: [Platform Modules]
+      summary: List the master module catalog
+      security: [{ platformBearerAuth: [] }]
+      responses:
+        "200":
+          description: Catalog
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/ModuleCatalogEntry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Platform Modules]
+      summary: Add a module to the catalog
+      description: "`key` is immutable once set — lowercase letters, numbers, underscores only."
+      security: [{ platformBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, name]
+              properties:
+                key: { type: string, pattern: "^[a-z0-9_]+$", example: inventory_mgmt }
+                name: { type: string, example: Inventory Management }
+                description: { type: string, nullable: true }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ModuleCatalogEntry" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/platform/modules/{id}:
+    patch:
+      tags: [Platform Modules]
+      summary: Edit a module's name/description (key cannot be changed)
+      security: [{ platformBearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/ModuleCatalogEntry" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ---------------------------------------------------------------------
+  # Module 2 — Organization Administration
+  # ---------------------------------------------------------------------
+  /api/org/auth/login:
+    post:
+      tags: [Org Auth]
+      summary: Org user login (resolves tenant by organization code)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organizationCode, email, password]
+              properties:
+                organizationCode: { type: string, example: hilite-builders }
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/AuthTokens"
+                          - type: object
+                            properties:
+                              user: { $ref: "#/components/schemas/OrgUserSession" }
+                              organization:
+                                type: object
+                                properties:
+                                  id: { type: string, format: uuid }
+                                  name: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Organization is suspended
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/org/auth/refresh:
+    post:
+      tags: [Org Auth]
+      summary: Exchange a refresh token for a new access+refresh pair
+      description: Re-reads the user fresh from the database, so a role/team change or deactivation is reflected on the new access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200":
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: "#/components/schemas/AuthTokens"
+                          - type: object
+                            properties:
+                              user: { $ref: "#/components/schemas/OrgUserSession" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/org/auth/logout:
+    post:
+      tags: [Org Auth]
+      summary: Revoke a refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200":
+          description: Always succeeds
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" }
+
+  /api/org/auth/me:
+    get:
+      tags: [Org Auth]
+      summary: Current org user profile
+      security: [{ orgBearerAuth: [] }]
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/OrgUserProfile" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/org/auth/change-password:
+    post:
+      tags: [Org Auth]
+      summary: Self-service password change (requires current password; clears must_change_password)
+      security: [{ orgBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChangePasswordRequest" }
+      responses:
+        "200":
+          description: Changed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          changed: { type: boolean, example: true }
+                          mustChangePassword: { type: boolean, example: false }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/org/teams:
+    post:
+      tags: [Org Teams]
+      summary: Create a team
+      security: [{ orgBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string, nullable: true }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [Org Teams]
+      summary: List teams (not paginated)
+      security: [{ orgBearerAuth: [] }]
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Team" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/org/teams/{id}:
+    patch:
+      tags: [Org Teams]
+      summary: Rename/update a team
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TeamId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Team" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Org Teams]
+      summary: Delete a team (members become unassigned, not deleted)
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/TeamId"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/org/roles:
+    post:
+      tags: [Org Roles]
+      summary: Create a custom role
+      security: [{ orgBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                dataScope: { $ref: "#/components/schemas/DataScope" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Role" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [Org Roles]
+      summary: List roles
+      security: [{ orgBearerAuth: [] }]
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Role" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/org/roles/{id}:
+    patch:
+      tags: [Org Roles]
+      summary: Rename and/or rescope a role (default roles included)
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/RoleId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                dataScope: { $ref: "#/components/schemas/DataScope" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Role" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Org Roles]
+      summary: Delete a custom role
+      description: "400 if it's a default role; 409 if any user still holds it."
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/RoleId"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/org/users:
+    post:
+      tags: [Org Users]
+      summary: Create a user (auto-generated temp password)
+      security: [{ orgBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateOrgUserRequest" }
+      responses:
+        "201":
+          description: Created — includes a one-time tempPassword
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/OrgUserWithTempPassword" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [Org Users]
+      summary: List users
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: teamId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: roleId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, inactive] }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - $ref: "#/components/schemas/PaginatedMeta"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/OrgUser" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/org/users/{id}:
+    get:
+      tags: [Org Users]
+      summary: Get a single user
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/OrgUser" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/org/users/{id}/assignment:
+    patch:
+      tags: [Org Users]
+      summary: Reassign a user's team and/or role
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                teamId: { type: string, format: uuid, nullable: true }
+                roleId: { type: string, format: uuid, nullable: true }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/OrgUser" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/org/users/{id}/reset-password:
+    post:
+      tags: [Org Users]
+      summary: Admin-initiated password reset for a user (lockout recovery)
+      description: Generates a new temp password, kills the user's sessions, re-flags must_change_password.
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: New temp password (shown once)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/OrgUserWithTempPassword" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/org/users/{id}/status:
+    patch:
+      tags: [Org Users]
+      summary: Activate or deactivate a user
+      description: Deactivating revokes that user's sessions immediately. The org's own admin account can't be deactivated this way.
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isActive]
+              properties:
+                isActive: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/OrgUser" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/org/modules:
+    get:
+      tags: [Org Modules]
+      summary: View this org's enabled modules (read-only — no write route exists)
+      security: [{ orgBearerAuth: [] }]
+      responses:
+        "200":
+          description: This org's modules
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/OrgModuleFlag" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # ---------------------------------------------------------------------
+  # Module 3 — Sales Management
+  # ---------------------------------------------------------------------
+  /api/sales/leads:
+    post:
+      tags: [Sales Leads]
+      summary: Create a lead (defaults to self-assignment)
+      description: Publishes `lead.created` and `lead.assigned` domain events.
+      security: [{ orgBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateLeadRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Lead" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    get:
+      tags: [Sales Leads]
+      summary: List leads (pre-filtered by the caller's data_scope before any of these filters apply)
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+          description: Matches name or mobile number
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/LeadStatus" }
+        - name: project
+          in: query
+          schema: { type: string }
+        - name: assignedUserId
+          in: query
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Paginated, scoped list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - $ref: "#/components/schemas/PaginatedMeta"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Lead" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/sales/leads/assignable-users:
+    get:
+      tags: [Sales Leads]
+      summary: Candidates the caller could assign a lead to (scoped the same way as leads)
+      security: [{ orgBearerAuth: [] }]
+      responses:
+        "200":
+          description: Minimal user list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/AssignableUser" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/sales/leads/{id}:
+    get:
+      tags: [Sales Leads]
+      summary: Get a lead
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      responses:
+        "200":
+          description: Detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Lead" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Outside the caller's data_scope
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Sales Leads]
+      summary: Edit a lead's core details
+      description: Same access check as viewing it, NOT the assignment check. Status and assignedUserId are intentionally excluded — they have their own endpoints with their own side effects.
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateLeadRequest" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Lead" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/sales/leads/{id}/status:
+    patch:
+      tags: [Sales Leads]
+      summary: Move a lead through the pipeline
+      description: Every transition is recorded in lead_status_history. Publishes `lead.won` when set to `won`.
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: "#/components/schemas/LeadStatus" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Lead" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/sales/leads/{id}/assign:
+    patch:
+      tags: [Sales Leads]
+      summary: Reassign a lead — manually, or bonus "least loaded" auto-assignment
+      description: Publishes `lead.assigned`. A manual target is re-verified as within the caller's scope (e.g. a team-scoped caller can't assign outside their team).
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [assignedUserId]
+                  properties:
+                    assignedUserId: { type: string, format: uuid }
+                - type: object
+                  required: [strategy]
+                  properties:
+                    strategy: { type: string, enum: [least_loaded] }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Lead" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/sales/leads/{id}/activities:
+    post:
+      tags: [Sales Leads]
+      summary: Log an activity against a lead
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { $ref: "#/components/schemas/ActivityType" }
+                notes: { type: string, nullable: true }
+                occurredAt: { type: string, format: date-time, nullable: true }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Activity" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    get:
+      tags: [Sales Leads]
+      summary: List activities for a lead
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Paginated, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - $ref: "#/components/schemas/PaginatedMeta"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Activity" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ---------------------------------------------------------------------
+  # Module 4 — Dashboard & Analytics
+  # ---------------------------------------------------------------------
+  /api/dashboard/summary:
+    get:
+      tags: [Dashboard]
+      summary: Role-aware dashboard summary
+      description: >
+        Always returns `personal`. Additionally returns `team` (data_scope
+        'team') or `organization` (data_scope 'organization', or any org
+        admin) — see the `scope` field to tell which.
+      security: [{ orgBearerAuth: [] }]
+      responses:
+        "200":
+          description: Summary, shaped by the caller's data_scope
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/DashboardSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ---------------------------------------------------------------------
+  # Module 5 — Notifications
+  # ---------------------------------------------------------------------
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: List the caller's own notifications
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema: { type: boolean }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Paginated, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - $ref: "#/components/schemas/PaginatedMeta"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Notification" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Unread count for the caller
+      security: [{ orgBearerAuth: [] }]
+      responses:
+        "200":
+          description: Count
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          count: { type: integer, example: 3 }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark one notification as read
+      description: 404 if it doesn't belong to the caller.
+      security: [{ orgBearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Notification" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/notifications/mark-all-read:
+    post:
+      tags: [Notifications]
+      summary: Mark every unread notification for the caller as read
+      security: [{ orgBearerAuth: [] }]
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+components:
+  securitySchemes:
+    platformBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Platform admin access token (JWT `type` claim = platform_admin)
+    orgBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Org user access token (JWT `type` claim = org_user)
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    OrganizationId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TeamId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    RoleId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    LeadId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Unauthorized:
+      description: Missing/malformed Authorization header, or token invalid/expired
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Forbidden:
+      description: Wrong token type, or caller lacks permission for this action
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    NotFound:
+      description: Doesn't exist for this caller (also returned for another tenant's data)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Conflict:
+      description: Duplicate value (code/email/name/key depending on endpoint)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: {}
+
+    PaginatedMeta:
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            page: { type: integer, example: 1 }
+            pageSize: { type: integer, example: 25 }
+            total: { type: integer, example: 142 }
+            totalPages: { type: integer, example: 6 }
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            message: { type: string }
+            details:
+              type: array
+              nullable: true
+              items: { type: string }
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, format: password }
+        newPassword: { type: string, format: password, minLength: 8 }
+
+    AuthTokens:
+      type: object
+      properties:
+        accessToken: { type: string, description: "JWT, 15 minute lifetime" }
+        refreshToken: { type: string, description: "Opaque, 30 day lifetime, rotates on use" }
+
+    PlatformAdmin:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        created_at: { type: string, format: date-time }
+
+    DataScope:
+      type: string
+      enum: [own, team, organization]
+      description: "own = just their leads; team = their whole team's; organization = everything"
+
+    CreateOrganizationRequest:
+      type: object
+      required: [name, code, adminName, adminEmail]
+      properties:
+        name: { type: string }
+        code: { type: string, pattern: "^[a-z0-9-]+$", example: hilite-builders }
+        logoUrl: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        adminName: { type: string }
+        adminEmail: { type: string, format: email }
+        enabledModuleKeys:
+          type: array
+          items: { type: string }
+          description: Defaults to every current module if omitted
+
+    Organization:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        code: { type: string }
+        logo_url: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        status: { type: string, enum: [active, suspended] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    OrgAdminUser:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        is_org_admin: { type: boolean, example: true }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    CreateOrganizationResult:
+      type: object
+      properties:
+        organization: { $ref: "#/components/schemas/Organization" }
+        adminUser: { $ref: "#/components/schemas/OrgAdminUser" }
+        tempPassword: { type: string, example: "Atlas-889-1bib" }
+
+    OrganizationListItem:
+      allOf:
+        - $ref: "#/components/schemas/Organization"
+        - type: object
+          properties:
+            user_count: { type: integer }
+            enabled_module_count: { type: integer }
+
+    OrganizationDetail:
+      allOf:
+        - $ref: "#/components/schemas/Organization"
+        - type: object
+          properties:
+            modules:
+              type: array
+              items: { $ref: "#/components/schemas/OrgModuleFlag" }
+            primaryAdmin:
+              $ref: "#/components/schemas/OrgAdminUser"
+              nullable: true
+
+    ModuleCatalogEntry:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        key: { type: string, example: sales_erp }
+        name: { type: string, example: Sales ERP }
+        description: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    OrgModuleFlag:
+      type: object
+      properties:
+        module_id: { type: integer }
+        key: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        enabled: { type: boolean }
+
+    OrgUserSession:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        isOrgAdmin: { type: boolean }
+        mustChangePassword: { type: boolean }
+
+    OrgUserProfile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        is_org_admin: { type: boolean }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    Team:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        member_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Role:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        is_default: { type: boolean }
+        data_scope: { $ref: "#/components/schemas/DataScope" }
+        user_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateOrgUserRequest:
+      type: object
+      required: [name, email]
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        teamId: { type: string, format: uuid, nullable: true }
+        roleId: { type: string, format: uuid, nullable: true }
+
+    OrgUser:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        is_org_admin: { type: boolean }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        team_id: { type: string, format: uuid, nullable: true }
+        team_name: { type: string, nullable: true }
+        role_id: { type: string, format: uuid, nullable: true }
+        role_name: { type: string, nullable: true }
+
+    OrgUserWithTempPassword:
+      allOf:
+        - $ref: "#/components/schemas/OrgUser"
+        - type: object
+          properties:
+            tempPassword: { type: string, example: "Falcon-308-b4yr" }
+
+    CreateLeadRequest:
+      type: object
+      required: [name, mobileNumber]
+      properties:
+        name: { type: string }
+        mobileNumber: { type: string, example: "9876543210" }
+        email: { type: string, format: email, nullable: true }
+        source: { type: string, nullable: true }
+        project: { type: string, nullable: true }
+        assignedUserId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Defaults to the caller if omitted
+
+    UpdateLeadRequest:
+      type: object
+      description: Every field optional — only what's sent is changed.
+      properties:
+        name: { type: string }
+        mobileNumber: { type: string }
+        email: { type: string, format: email, nullable: true }
+        source: { type: string, nullable: true }
+        project: { type: string, nullable: true }
+
+    LeadStatus:
+      type: string
+      enum: [new, contacted, visit_scheduled, site_visit_completed, negotiation, won, lost]
+
+    ActivityType:
+      type: string
+      enum: [phone_call, meeting, site_visit, virtual_meeting]
+
+    Lead:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        mobile_number: { type: string }
+        email: { type: string, nullable: true }
+        source: { type: string, nullable: true }
+        project: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/LeadStatus" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        assigned_user_id: { type: string, format: uuid, nullable: true }
+        assigned_user_name: { type: string, nullable: true }
+        assigned_user_team_id: { type: string, format: uuid, nullable: true }
+        created_by_id: { type: string, format: uuid }
+        created_by_name: { type: string }
+
+    AssignableUser:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        team_id: { type: string, format: uuid, nullable: true }
+
+    Activity:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        lead_id: { type: string, format: uuid }
+        type: { $ref: "#/components/schemas/ActivityType" }
+        notes: { type: string, nullable: true }
+        occurred_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        created_by_name: { type: string, nullable: true }
+
+    LeadsByStatusEntry:
+      type: object
+      properties:
+        status: { $ref: "#/components/schemas/LeadStatus" }
+        count: { type: integer }
+
+    DashboardPersonal:
+      type: object
+      properties:
+        total_leads: { type: integer }
+        won_leads: { type: integer }
+        conversion_rate: { type: number, example: 33.3 }
+        leadsByStatus:
+          type: array
+          items: { $ref: "#/components/schemas/LeadsByStatusEntry" }
+        activities:
+          type: object
+          properties:
+            total: { type: integer }
+            last_30_days: { type: integer }
+        recentLeads:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              status: { $ref: "#/components/schemas/LeadStatus" }
+              created_at: { type: string, format: date-time }
+        recentActivities:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              type: { $ref: "#/components/schemas/ActivityType" }
+              notes: { type: string, nullable: true }
+              occurred_at: { type: string, format: date-time }
+              lead_name: { type: string }
+              lead_id: { type: string, format: uuid }
+
+    LeaderboardRow:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        total_leads: { type: integer }
+        won_leads: { type: integer }
+        conversion_rate: { type: number }
+        activity_count: { type: integer }
+
+    TopTeamRow:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        total_leads: { type: integer }
+        won_leads: { type: integer }
+        conversion_rate: { type: number }
+
+    TopExecutiveRow:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        team_name: { type: string, nullable: true }
+        total_leads: { type: integer }
+        won_leads: { type: integer }
+        conversion_rate: { type: number }
+
+    DashboardSummary:
+      type: object
+      properties:
+        scope: { type: string, enum: [own, team, organization] }
+        personal: { $ref: "#/components/schemas/DashboardPersonal" }
+        team:
+          type: object
+          nullable: true
+          properties:
+            leaderboard:
+              type: array
+              items: { $ref: "#/components/schemas/LeaderboardRow" }
+        organization:
+          type: object
+          nullable: true
+          properties:
+            total_leads: { type: integer }
+            won_leads: { type: integer }
+            conversion_rate: { type: number }
+            totalActivities: { type: integer }
+            leadsByStatus:
+              type: array
+              items: { $ref: "#/components/schemas/LeadsByStatusEntry" }
+            topTeams:
+              type: array
+              items: { $ref: "#/components/schemas/TopTeamRow" }
+            topExecutives:
+              type: array
+              items: { $ref: "#/components/schemas/TopExecutiveRow" }
+
+    NotificationType:
+      type: string
+      enum: [lead_assigned, lead_won]
+
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { $ref: "#/components/schemas/NotificationType" }
+        title: { type: string }
+        body: { type: string, nullable: true }
+        lead_id: { type: string, format: uuid, nullable: true }
+        is_read: { type: boolean }
+        created_at: { type: string, format: date-time }
