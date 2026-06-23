@@ -1,0 +1,2295 @@
+{
+  "info": {
+    "name": "HiLite Sales OS API",
+    "description": "Multi-tenant Sales ERP API — five modules, two auth principals. See API.md in the repo for the full narrative. Run \"Platform Login\" first, then \"Create Organization\" (saves org code + temp password), then \"Org Login\" — most other requests build on those collection variables automatically via each request's Tests script.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "platformAccessToken",
+      "value": ""
+    },
+    {
+      "key": "platformRefreshToken",
+      "value": ""
+    },
+    {
+      "key": "orgAccessToken",
+      "value": ""
+    },
+    {
+      "key": "orgRefreshToken",
+      "value": ""
+    },
+    {
+      "key": "organizationId",
+      "value": ""
+    },
+    {
+      "key": "organizationCode",
+      "value": "hilite-builders"
+    },
+    {
+      "key": "adminTempPassword",
+      "value": ""
+    },
+    {
+      "key": "teamId",
+      "value": ""
+    },
+    {
+      "key": "roleId",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "userTempPassword",
+      "value": ""
+    },
+    {
+      "key": "leadId",
+      "value": ""
+    },
+    {
+      "key": "moduleId",
+      "value": ""
+    },
+    {
+      "key": "notificationId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Module 1 — Platform Administration",
+      "item": [
+        {
+          "name": "Auth",
+          "item": [
+            {
+              "name": "Platform Login",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "auth",
+                    "login"
+                  ]
+                },
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"admin@hilite.os\",\n  \"password\": \"ChangeMe123!\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('platformAccessToken', data.data.accessToken);",
+                      "  pm.collectionVariables.set('platformRefreshToken', data.data.refreshToken);",
+                      "  console.log('Saved platform tokens');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Refresh",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/auth/refresh",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "auth",
+                    "refresh"
+                  ]
+                },
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"{{platformRefreshToken}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('platformAccessToken', data.data.accessToken);",
+                      "  pm.collectionVariables.set('platformRefreshToken', data.data.refreshToken);",
+                      "  console.log('Saved platform tokens');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Logout",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/auth/logout",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "auth",
+                    "logout"
+                  ]
+                },
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"{{platformRefreshToken}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Me",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/auth/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "auth",
+                    "me"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{platformAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Change Password",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/auth/change-password",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "auth",
+                    "change-password"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{platformAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"ChangeMe123!\",\n  \"newPassword\": \"a-new-password-123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Organizations",
+          "item": [
+            {
+              "name": "Create Organization",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/organizations",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "organizations"
+                  ]
+                },
+                "description": "Creates the org + its first admin user in one transaction. enabledModuleKeys is omittable (defaults to every current module).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{platformAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"HiLite Builders\",\n  \"code\": \"hilite-builders\",\n  \"adminName\": \"Asha Menon\",\n  \"adminEmail\": \"asha@hilitebuilders.com\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('organizationId', data.data.organization.id);",
+                      "  pm.collectionVariables.set('organizationCode', data.data.organization.code);",
+                      "  pm.collectionVariables.set('adminTempPassword', data.data.tempPassword);",
+                      "  console.log('Saved organizationId + adminTempPassword');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Organizations",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/organizations",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "organizations"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "active",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "disabled": true
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "25",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{platformAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Organization",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/organizations/{{organizationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "organizations",
+                    "{{organizationId}}"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{platformAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Reset Org Admin Password",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/organizations/{{organizationId}}/reset-admin-password",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "organizations",
+                    "{{organizationId}}",
+                    "reset-admin-password"
+                  ]
+                },
+                "description": "Lockout recovery — new temp password, kills the admin's sessions, re-flags must_change_password.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{platformAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('adminTempPassword', data.data.tempPassword);",
+                      "  console.log('Saved new adminTempPassword');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Update Organization Status",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/organizations/{{organizationId}}/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "organizations",
+                    "{{organizationId}}",
+                    "status"
+                  ]
+                },
+                "description": "status: \"active\" or \"suspended\". Suspending revokes every session for every user in that org.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{platformAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"active\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Organization Modules",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/organizations/{{organizationId}}/modules",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "organizations",
+                    "{{organizationId}}",
+                    "modules"
+                  ]
+                },
+                "description": "Upsert — moduleId is the numeric id from the module catalog (see Modules Catalog > List Modules).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{platformAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"modules\": [\n    {\n      \"moduleId\": 1,\n      \"enabled\": true\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Modules Catalog",
+          "item": [
+            {
+              "name": "List Modules",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/modules",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "modules"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{platformAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Module",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/modules",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "modules"
+                  ]
+                },
+                "description": "key is immutable once set: lowercase letters/numbers/underscores only.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{platformAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"key\": \"inventory_mgmt\",\n  \"name\": \"Inventory Management\",\n  \"description\": \"Track stock levels\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('moduleId', String(data.data.id));",
+                      "  console.log('Saved moduleId');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Update Module",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/platform/modules/{{moduleId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "platform",
+                    "modules",
+                    "{{moduleId}}"
+                  ]
+                },
+                "description": "key cannot be changed here.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{platformAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Inventory Management Pro\",\n  \"description\": \"Now with barcode scanning\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Module 2 — Organization Administration",
+      "item": [
+        {
+          "name": "Auth",
+          "item": [
+            {
+              "name": "Org Login",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "Use the org admin's email with {{adminTempPassword}} from Create Organization (or the org's reset-admin-password response).",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"organizationCode\": \"{{organizationCode}}\",\n  \"email\": \"asha@hilitebuilders.com\",\n  \"password\": \"{{adminTempPassword}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('orgAccessToken', data.data.accessToken);",
+                      "  pm.collectionVariables.set('orgRefreshToken', data.data.refreshToken);",
+                      "  console.log('Saved org tokens');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Refresh",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/auth/refresh",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "auth",
+                    "refresh"
+                  ]
+                },
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"{{orgRefreshToken}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('orgAccessToken', data.data.accessToken);",
+                      "  pm.collectionVariables.set('orgRefreshToken', data.data.refreshToken);",
+                      "  console.log('Saved org tokens');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Logout",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/auth/logout",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "auth",
+                    "logout"
+                  ]
+                },
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"{{orgRefreshToken}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Me",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/auth/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "auth",
+                    "me"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Change Password",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/auth/change-password",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "auth",
+                    "change-password"
+                  ]
+                },
+                "description": "Requires the CURRENT password — use this for a fresh temp password's forced first change.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"{{adminTempPassword}}\",\n  \"newPassword\": \"a-real-password-123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Teams (admin-only)",
+          "item": [
+            {
+              "name": "Create Team",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/teams",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "teams"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"North Zone\",\n  \"description\": \"North region sales team\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('teamId', data.data.id);",
+                      "  console.log('Saved teamId');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Teams",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/teams",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "teams"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Team",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/teams/{{teamId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "teams",
+                    "{{teamId}}"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"North Zone\",\n  \"description\": \"Updated description\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Team",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/teams/{{teamId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "teams",
+                    "{{teamId}}"
+                  ]
+                },
+                "description": "Members become unassigned (team_id = null), not deleted.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Roles (admin-only)",
+          "item": [
+            {
+              "name": "Create Role",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/roles",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "roles"
+                  ]
+                },
+                "description": "dataScope: own / team / organization. Defaults to \"own\" if omitted.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Regional Head\",\n  \"dataScope\": \"team\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('roleId', data.data.id);",
+                      "  console.log('Saved roleId');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Roles",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/roles",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "roles"
+                  ]
+                },
+                "description": "Every org is seeded with 4 defaults: Executive (own), Team Lead (team), Sales Manager (team), Director (organization).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Role",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/roles/{{roleId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "roles",
+                    "{{roleId}}"
+                  ]
+                },
+                "description": "Works on default roles too — rename and/or rescope freely.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Regional Head\",\n  \"dataScope\": \"organization\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Role",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/roles/{{roleId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "roles",
+                    "{{roleId}}"
+                  ]
+                },
+                "description": "400 if it's a default role; 409 if any user still holds it.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Users (admin-only)",
+          "item": [
+            {
+              "name": "Create User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/users",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "users"
+                  ]
+                },
+                "description": "teamId/roleId are independently re-verified as belonging to this org. Returns a one-time tempPassword.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Ravi Kumar\",\n  \"email\": \"ravi@hilitebuilders.com\",\n  \"teamId\": \"{{teamId}}\",\n  \"roleId\": \"{{roleId}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('userId', data.data.id);",
+                      "  pm.collectionVariables.set('userTempPassword', data.data.tempPassword);",
+                      "  console.log('Saved userId + userTempPassword');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Users",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/users",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "users"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "teamId",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "roleId",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "active",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "disabled": true
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "25",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get User",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/users/{{userId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "users",
+                    "{{userId}}"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update User Assignment",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/users/{{userId}}/assignment",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "users",
+                    "{{userId}}",
+                    "assignment"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"teamId\": \"{{teamId}}\",\n  \"roleId\": \"{{roleId}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Reset User Password",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/users/{{userId}}/reset-password",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "users",
+                    "{{userId}}",
+                    "reset-password"
+                  ]
+                },
+                "description": "Lockout recovery — new temp password, kills the user's sessions, re-flags must_change_password.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('userTempPassword', data.data.tempPassword);",
+                      "  console.log('Saved new userTempPassword');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Update User Status",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/users/{{userId}}/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "users",
+                    "{{userId}}",
+                    "status"
+                  ]
+                },
+                "description": "Deactivating revokes that user's sessions immediately. The org's own admin account can't be deactivated this way.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"isActive\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Modules (admin-only, read-only)",
+          "item": [
+            {
+              "name": "List Org Modules",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/org/modules",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "org",
+                    "modules"
+                  ]
+                },
+                "description": "Read-only — there is no write route on this side. Enabling a module for this org is exclusively a platform-admin action (see Module 1 > Organizations > Update Organization Modules).",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Module 3 — Sales Management",
+      "item": [
+        {
+          "name": "Leads (any org user, scoped by role)",
+          "item": [
+            {
+              "name": "Create Lead",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/sales/leads",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "sales",
+                    "leads"
+                  ]
+                },
+                "description": "Defaults to self-assignment if assignedUserId is omitted. Publishes lead.created + lead.assigned events.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"John Buyer\",\n  \"mobileNumber\": \"9876543210\",\n  \"project\": \"Skyline Towers\",\n  \"source\": \"Website\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const data = pm.response.json();",
+                      "if (data.success) {",
+                      "  pm.collectionVariables.set('leadId', data.data.id);",
+                      "  console.log('Saved leadId');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Leads",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/sales/leads",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "sales",
+                    "leads"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "new",
+                      "disabled": true
+                    },
+                    {
+                      "key": "project",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "assignedUserId",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "disabled": true
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "25",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Pre-filtered by the caller's data_scope before any of these query filters apply.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List Assignable Users",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/sales/leads/assignable-users",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "sales",
+                    "leads",
+                    "assignable-users"
+                  ]
+                },
+                "description": "Candidates the caller could assign a lead to — scoped the same way as the leads list itself.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Lead",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/sales/leads/{{leadId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "sales",
+                    "leads",
+                    "{{leadId}}"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Lead Details",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/sales/leads/{{leadId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "sales",
+                    "leads",
+                    "{{leadId}}"
+                  ]
+                },
+                "description": "Every field optional. Same access check as viewing — NOT the assignment check. Excludes status/assignedUserId on purpose.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"project\": \"Skyline Towers Phase 2\",\n  \"source\": \"Referral\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Lead Status",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/sales/leads/{{leadId}}/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "sales",
+                    "leads",
+                    "{{leadId}}",
+                    "status"
+                  ]
+                },
+                "description": "One of: new, contacted, visit_scheduled, site_visit_completed, negotiation, won, lost. Publishes lead.won when set to \"won\".",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"contacted\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Assign Lead (manual)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/sales/leads/{{leadId}}/assign",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "sales",
+                    "leads",
+                    "{{leadId}}",
+                    "assign"
+                  ]
+                },
+                "description": "Manual target is re-verified as within the caller's scope.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assignedUserId\": \"{{userId}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Assign Lead (least loaded)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/sales/leads/{{leadId}}/assign",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "sales",
+                    "leads",
+                    "{{leadId}}",
+                    "assign"
+                  ]
+                },
+                "description": "Bonus auto-assignment — picks whichever eligible active user (within the caller's scope) has the fewest open leads.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"strategy\": \"least_loaded\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Log Activity",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/sales/leads/{{leadId}}/activities",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "sales",
+                    "leads",
+                    "{{leadId}}",
+                    "activities"
+                  ]
+                },
+                "description": "type: phone_call / meeting / site_visit / virtual_meeting.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"type\": \"phone_call\",\n  \"notes\": \"Discussed pricing and timeline\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List Activities",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/sales/leads/{{leadId}}/activities",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "sales",
+                    "leads",
+                    "{{leadId}}",
+                    "activities"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "disabled": true
+                    },
+                    {
+                      "key": "pageSize",
+                      "value": "25",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{orgAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Module 4 — Dashboard & Analytics",
+      "item": [
+        {
+          "name": "Get Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dashboard",
+                "summary"
+              ]
+            },
+            "description": "Always includes \"personal\". Additionally includes \"team\" (data_scope=team) or \"organization\" (data_scope=organization, or any admin) — check the \"scope\" field in the response to see which.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Module 5 — Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "unreadOnly",
+                  "value": "true",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "pageSize",
+                  "value": "25",
+                  "disabled": true
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.success && data.data.length > 0) {",
+                  "  pm.collectionVariables.set('notificationId', data.data[0].id);",
+                  "  console.log('Saved notificationId from first result');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/unread-count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "unread-count"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark One As Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/{{notificationId}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "{{notificationId}}",
+                "read"
+              ]
+            },
+            "description": "404 if the notification doesn't belong to the caller.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All As Read",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/mark-all-read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "mark-all-read"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{orgAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

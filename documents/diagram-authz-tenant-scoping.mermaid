@@ -1,0 +1,25 @@
+flowchart TD
+    A["Incoming request<br/>Authorization: Bearer token"] --> B{"Signature valid<br/>& not expired?"}
+    B -- No --> B1["401 Unauthorized"]
+    B -- Yes --> C{"payload.type matches<br/>this route's principal?<br/>(platform_admin vs org_user)"}
+    C -- No --> C1["403 Forbidden<br/>wrong token type"]
+    C -- Yes --> D["req.orgUser = id, organizationId,<br/>isOrgAdmin, roleId, teamId, dataScope<br/>— all read from the verified token"]
+    D --> E{"Route needs<br/>requireOrgAdmin?"}
+    E -- "Yes, and not admin" --> E1["403 Forbidden"]
+    E -- "No, or is admin" --> F["Service layer query"]
+    F --> G["WHERE organization_id = req.orgUser.organizationId<br/>never from req.params or req.body"]
+    G --> H{"Any client-supplied id<br/>in the request?<br/>(teamId, roleId, assignedUserId)"}
+    H -- Yes --> H1["Re-verify that id belongs to<br/>this same organization_id<br/>before using it"]
+    H -- No --> I
+    H1 --> I{"Endpoint is data_scope-aware?<br/>(Module 3 / 4)"}
+    I -- "own" --> I1["+ AND assigned_user_id = orgUser.id"]
+    I -- "team" --> I2["+ AND assigned_user.team_id = orgUser.teamId"]
+    I -- "organization or isOrgAdmin" --> I3["no further filter — whole org"]
+    I -- "not scope-aware" --> I4["org-level filter is sufficient"]
+    I1 --> J["Execute query"]
+    I2 --> J
+    I3 --> J
+    I4 --> J
+    J --> K{"Row found?"}
+    K -- No --> K1["404 — indistinguishable from<br/>'belongs to another tenant'"]
+    K -- Yes --> K2["200 / 201 with data"]

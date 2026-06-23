@@ -1,0 +1,34 @@
+flowchart LR
+    subgraph M1["Module 1 — Platform Admin"]
+        M1F["routes → controller → service"]
+    end
+    subgraph M2["Module 2 — Org Admin"]
+        M2F["routes → controller → service"]
+    end
+    subgraph M3["Module 3 — Sales Management"]
+        M3F["routes → controller → service"]
+    end
+    subgraph M4["Module 4 — Dashboard"]
+        M4F["routes → controller → service"]
+    end
+    subgraph M5["Module 5 — Notifications"]
+        M5F["routes → controller → service"]
+        M5E["event subscribers<br/>(notification.events.js)"]
+    end
+
+    Shared["Shared middleware & utils<br/>requirePlatformAdmin / requireOrgUser / requireOrgAdmin<br/>jwt · pagination · auditLog · refreshToken · ApiError"]
+    EventBus[["Event Bus<br/>publish() / subscribe()"]]
+
+    M1 -.-> Shared
+    M2 -.-> Shared
+    M3 -.-> Shared
+    M4 -.-> Shared
+    M5 -.-> Shared
+
+    M3F -- "publish('lead.assigned'/'lead.won')" --> EventBus
+    EventBus -- "subscribe()" --> M5E
+    M5E --> M5F
+
+    M2 --x M3
+    M3 --x M5
+    M4 -. "reads roles.data_scope,<br/>same mechanism as M3" .-> M3F

@@ -1,0 +1,23 @@
+{
+  "name": "hilite-sales-os",
+  "private": true,
+  "version": "1.0.0",
+  "description": "HiLITE Sales OS — multi-tenant Sales ERP (monorepo root)",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,magenta \"npm run dev -w @hilite/backend\" \"npm run dev -w @hilite/frontend\"",
+    "dev:backend": "npm run dev -w @hilite/backend",
+    "dev:frontend": "npm run dev -w @hilite/frontend",
+    "migrate": "npm run migrate -w @hilite/backend",
+    "migrate:seed": "npm run migrate:seed -w @hilite/backend",
+    "build:frontend": "npm run build -w @hilite/frontend",
+    "lint:frontend": "npm run lint -w @hilite/frontend",
+    "start:backend": "npm run start -w @hilite/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

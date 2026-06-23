@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------
+   Design tokens — HiLITE Sales OS Platform Console
+   Palette: Ink (near-black navy) + Paper (warm neutral) + Lite Gold,
+   the signature accent that nods to the "HiLite" name — used sparingly,
+   as an actual highlight mark, never as a base color.
+   --------------------------------------------------------------------- */
+@theme {
+  --color-ink: #15171e;
+  --color-ink-soft: #1f222c;
+  --color-paper: #f6f5f2;
+  --color-paper-raised: #ffffff;
+  --color-slate: #5b6270;
+  --color-slate-light: #9aa0ab;
+  --color-line: #e4e2dc;
+  --color-gold: #e2a33b;
+  --color-gold-soft: #fbe8c8;
+  --color-verdant: #1f8a5f;
+  --color-verdant-soft: #e1f3ea;
+  --color-ember: #c2410c;
+  --color-ember-soft: #fbe5da;
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+}
+
+/* The "highlight" signature mark — a short hand-drawn-feeling gold stroke
+   used under the wordmark and under key stat numbers. This is the one
+   recurring flourish in the whole UI; everything else stays quiet. */
+.lite-mark {
+  position: relative;
+  display: inline-block;
+}
+.lite-mark::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: 2px;
+  height: 0.4em;
+  background: var(--color-gold);
+  opacity: 0.45;
+  z-index: -1;
+  transform: rotate(-0.6deg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}

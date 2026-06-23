@@ -1,0 +1,36 @@
+sequenceDiagram
+    participant Rep as Org user (Module 3 caller)
+    participant M3 as Module 3 service<br/>(lead.service.js)
+    participant EB as Event Bus<br/>(in-process EventEmitter)
+    participant M5 as Module 5 subscriber<br/>(notification.events.js)
+    participant DB as Postgres
+    participant Bell as NotificationBell.jsx<br/>(any logged-in org user)
+
+    Rep->>M3: PATCH /api/sales/leads/:id/assign<br/>{ assignedUserId }
+    M3->>DB: UPDATE leads SET assigned_user_id = ...
+    M3->>EB: publish('lead.assigned', { organizationId, leadId, assignedUserId, assignedById })
+    M3-->>Rep: 200 OK
+    Note over M3,EB: Module 3 has no import of, or reference to,<br/>anything in Module 5 — publish() is a fire-and-forget call
+
+    Note over EB,M5: subscribed once at server startup (server.js)
+    EB->>M5: invoke handleLeadAssigned(payload)
+    alt assignedUserId === assignedById
+        M5->>M5: return early — no self-notification
+    else
+        M5->>DB: SELECT lead name, assigner name
+        M5->>DB: INSERT INTO notifications (user_id=assignedUserId, type='lead_assigned', ...)
+    end
+
+    Note over Bell,M5: separately, on 'lead.won': notifies every org admin,<br/>skipping the admin who closed it themselves
+
+    loop every 30 seconds
+        Bell->>M5: GET /api/notifications/unread-count
+        M5->>DB: SELECT COUNT(*) WHERE user_id=caller AND is_read=false
+        M5-->>Bell: { count }
+    end
+
+    Bell->>M5: GET /api/notifications (on bell click)
+    M5-->>Bell: most recent notifications, scoped to caller
+    Bell->>M5: PATCH /api/notifications/:id/read
+    M5->>DB: UPDATE ... WHERE id=:id AND user_id=caller
+    M5-->>Bell: updated row (404 if it wasn't this caller's)

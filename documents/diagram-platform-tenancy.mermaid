@@ -1,0 +1,25 @@
+erDiagram
+    PLATFORM_ADMINS {
+        uuid id PK
+        varchar email UK
+    }
+
+    ORGANIZATIONS {
+        uuid id PK
+        varchar code UK
+        enum status
+    }
+
+    MODULES {
+        integer id PK
+        varchar key UK
+    }
+
+    ORGANIZATION_MODULES {
+        uuid organization_id PK_FK
+        integer module_id PK_FK
+        boolean enabled
+    }
+
+    ORGANIZATIONS ||--o{ ORGANIZATION_MODULES : "enables"
+    MODULES       ||--o{ ORGANIZATION_MODULES : "enabled via"

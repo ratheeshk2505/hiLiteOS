@@ -1,0 +1,38 @@
+flowchart TB
+    subgraph Browser["Browser — React 19 SPA (Vite build)"]
+        PC["Platform Console<br/>/platform/*<br/>(own auth context, own token keys)"]
+        OC["Org Console<br/>/org/*<br/>(own auth context, own token keys)"]
+    end
+
+    subgraph API["Express API — single Node process, npm-workspace package 'backend'"]
+        MW["Middleware chain<br/>helmet → compression → cors → json → morgan → rate-limit"]
+        M1["Module 1<br/>Platform Admin<br/>/api/platform"]
+        M2["Module 2<br/>Org Admin<br/>/api/org"]
+        M3["Module 3<br/>Sales Mgmt<br/>/api/sales"]
+        M4["Module 4<br/>Dashboard<br/>/api/dashboard"]
+        M5["Module 5<br/>Notifications<br/>/api/notifications"]
+        EB[["In-process Event Bus<br/>(Node EventEmitter)"]]
+    end
+
+    DB[("PostgreSQL<br/>Neon, serverless, pooled connection")]
+    REDIS[("Redis<br/>optional — shared rate-limit store<br/>for multi-instance deployments")]
+
+    PC -- "Bearer JWT (type=platform_admin)" --> MW
+    OC -- "Bearer JWT (type=org_user)" --> MW
+
+    MW --> M1
+    MW --> M2
+    MW --> M3
+    MW --> M4
+    MW --> M5
+
+    M1 --> DB
+    M2 --> DB
+    M3 --> DB
+    M4 --> DB
+    M5 --> DB
+
+    M3 -. "publish('lead.assigned' / 'lead.won')" .-> EB
+    EB -. "subscribe()" .-> M5
+
+    MW -. "rate-limit counters<br/>(when REDIS_URL is set)" .-> REDIS

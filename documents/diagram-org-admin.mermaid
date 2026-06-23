@@ -1,0 +1,33 @@
+erDiagram
+    ORGANIZATIONS {
+        uuid id PK
+        varchar code UK
+    }
+
+    TEAMS {
+        uuid id PK
+        uuid organization_id FK
+        varchar name
+    }
+
+    ROLES {
+        uuid id PK
+        uuid organization_id FK
+        varchar name
+        enum data_scope
+    }
+
+    USERS {
+        uuid id PK
+        uuid organization_id FK
+        boolean is_org_admin
+        uuid role_id FK
+        uuid team_id FK
+        boolean must_change_password
+    }
+
+    ORGANIZATIONS ||--o{ TEAMS  : "has"
+    ORGANIZATIONS ||--o{ ROLES  : "has"
+    ORGANIZATIONS ||--o{ USERS  : "has"
+    TEAMS         ||--o{ USERS  : "assigned to"
+    ROLES         ||--o{ USERS  : "assigned to"

@@ -1,0 +1,35 @@
+sequenceDiagram
+    actor U as User (browser)
+    participant FE as Frontend (axios client)
+    participant API as Express API
+    participant DB as Postgres
+
+    U->>FE: enters credentials
+    FE->>API: POST /auth/login<br/>{ email or organizationCode+email, password }
+    API->>DB: bcrypt.compare(password, password_hash)
+    DB-->>API: user/admin row
+    API->>API: sign access token (JWT, 15m, type=platform_admin|org_user)
+    API->>DB: insert refresh_tokens row (sha256 hash only, 30d expiry)
+    API-->>FE: { accessToken, refreshToken, user }
+    FE->>FE: store both in localStorage (per-console keys)
+
+    Note over FE,API: time passes — access token still valid
+    FE->>API: GET /api/sales/leads (Authorization Bearer accessToken)
+    API-->>FE: 200 OK
+
+    Note over FE,API: 15 minutes later — access token expired
+    FE->>API: GET /api/sales/leads (Bearer expired accessToken)
+    API-->>FE: 401 Unauthorized
+    FE->>API: POST /auth/refresh { refreshToken }
+    API->>DB: verify token_hash exists, not revoked, not expired
+    API->>DB: revoke old token row, insert new one (rotation)
+    API-->>FE: { accessToken (new), refreshToken (new) }
+    FE->>API: retries GET /api/sales/leads (Bearer new accessToken)
+    API-->>FE: 200 OK
+
+    Note over FE: concurrent 401s share one in-flight<br/>refresh promise instead of each calling /refresh
+
+    U->>FE: clicks "Sign out"
+    FE->>API: POST /auth/logout { refreshToken }
+    API->>DB: revoke that refresh token row
+    FE->>FE: clear localStorage, redirect to login

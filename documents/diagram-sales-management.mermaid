@@ -1,0 +1,36 @@
+erDiagram
+    USERS {
+        uuid id PK
+        uuid team_id FK
+        uuid role_id FK
+    }
+
+    LEADS {
+        uuid id PK
+        uuid organization_id FK
+        enum status
+        uuid assigned_user_id FK
+        uuid created_by_id FK
+    }
+
+    LEAD_STATUS_HISTORY {
+        uuid id PK
+        uuid lead_id FK
+        enum from_status
+        enum to_status
+        uuid changed_by_id FK
+    }
+
+    ACTIVITIES {
+        uuid id PK
+        uuid lead_id FK
+        enum type
+        uuid created_by_id FK
+    }
+
+    USERS ||--o{ LEADS               : "assigned"
+    USERS ||--o{ LEADS               : "created"
+    USERS ||--o{ LEAD_STATUS_HISTORY : "changed"
+    USERS ||--o{ ACTIVITIES          : "logged"
+    LEADS ||--o{ LEAD_STATUS_HISTORY : "has"
+    LEADS ||--o{ ACTIVITIES          : "has"

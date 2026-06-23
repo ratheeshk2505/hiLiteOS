@@ -1,0 +1,160 @@
+erDiagram
+    PLATFORM_ADMINS {
+        uuid id PK
+        varchar name
+        varchar email UK
+        varchar password_hash
+        timestamptz created_at
+    }
+
+    MODULES {
+        integer id PK
+        varchar key UK
+        varchar name
+        text description
+        timestamptz created_at
+    }
+
+    ORGANIZATIONS {
+        uuid id PK
+        varchar name
+        varchar code UK
+        text logo_url
+        text description
+        enum status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    ORGANIZATION_MODULES {
+        uuid organization_id PK_FK
+        integer module_id PK_FK
+        boolean enabled
+        timestamptz updated_at
+    }
+
+    TEAMS {
+        uuid id PK
+        uuid organization_id FK
+        varchar name
+        text description
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    ROLES {
+        uuid id PK
+        uuid organization_id FK
+        varchar name
+        boolean is_default
+        enum data_scope
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    USERS {
+        uuid id PK
+        uuid organization_id FK
+        varchar name
+        varchar email
+        varchar password_hash
+        boolean is_active
+        boolean is_org_admin
+        uuid role_id FK
+        uuid team_id FK
+        boolean must_change_password
+        timestamptz created_at
+    }
+
+    LEADS {
+        uuid id PK
+        uuid organization_id FK
+        varchar name
+        varchar mobile_number
+        varchar email
+        varchar source
+        varchar project
+        enum status
+        uuid assigned_user_id FK
+        uuid created_by_id FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    LEAD_STATUS_HISTORY {
+        uuid id PK
+        uuid lead_id FK
+        enum from_status
+        enum to_status
+        uuid changed_by_id FK
+        timestamptz created_at
+    }
+
+    ACTIVITIES {
+        uuid id PK
+        uuid lead_id FK
+        uuid organization_id FK
+        enum type
+        text notes
+        timestamptz occurred_at
+        uuid created_by_id FK
+        timestamptz created_at
+    }
+
+    NOTIFICATIONS {
+        uuid id PK
+        uuid organization_id FK
+        uuid user_id FK
+        enum type
+        varchar title
+        text body
+        uuid lead_id FK
+        boolean is_read
+        timestamptz created_at
+    }
+
+    REFRESH_TOKENS {
+        uuid id PK
+        varchar subject_type
+        uuid subject_id "polymorphic, see note"
+        varchar token_hash UK
+        timestamptz expires_at
+        timestamptz revoked_at
+        uuid replaced_by_id FK
+        timestamptz created_at
+        text user_agent
+        varchar ip_address
+    }
+
+    AUDIT_LOGS {
+        uuid id PK
+        uuid organization_id FK
+        varchar actor_type
+        uuid actor_id "polymorphic, see note"
+        varchar action
+        varchar target_type
+        uuid target_id "polymorphic, see note"
+        jsonb metadata
+        timestamptz created_at
+    }
+
+    ORGANIZATIONS ||--o{ ORGANIZATION_MODULES : "enables"
+    MODULES       ||--o{ ORGANIZATION_MODULES : "enabled via"
+    ORGANIZATIONS ||--o{ TEAMS                : "has"
+    ORGANIZATIONS ||--o{ ROLES                : "has"
+    ORGANIZATIONS ||--o{ USERS                : "has"
+    ORGANIZATIONS ||--o{ LEADS                : "owns"
+    ORGANIZATIONS ||--o{ ACTIVITIES            : "owns"
+    ORGANIZATIONS ||--o{ NOTIFICATIONS         : "owns"
+    ORGANIZATIONS ||--o{ AUDIT_LOGS            : "scoped to"
+    TEAMS         ||--o{ USERS                : "assigned to"
+    ROLES         ||--o{ USERS                : "assigned to"
+    USERS         ||--o{ LEADS                : "assigned"
+    USERS         ||--o{ LEADS                : "created"
+    USERS         ||--o{ LEAD_STATUS_HISTORY  : "changed"
+    USERS         ||--o{ ACTIVITIES           : "logged"
+    USERS         ||--o{ NOTIFICATIONS        : "receives"
+    LEADS         ||--o{ LEAD_STATUS_HISTORY  : "has"
+    LEADS         ||--o{ ACTIVITIES           : "has"
+    LEADS         ||--o{ NOTIFICATIONS        : "about"
+    REFRESH_TOKENS ||--o| REFRESH_TOKENS      : "rotated into"
